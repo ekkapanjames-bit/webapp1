@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบสร้างเอกสารอัตโนมัติ</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--pc:#a855f7;--bd:rgba(255,255,255,.2)}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Prompt',sans-serif;color:#fff;min-height:100vh;background:#0b0820 radial-gradient(circle at 15% 10%,rgba(236,72,153,.35),transparent 40%),radial-gradient(circle at 85% 20%,rgba(99,102,241,.35),transparent 45%) fixed}
+option{color:#111}
+.wrap{max-width:900px;margin:0 auto;padding:16px 14px 50px}
+h1{font-size:22px;font-weight:500;margin:6px 0 14px}
+h3{margin:0 0 10px;font-weight:500}
+.g{background:rgba(255,255,255,.08);backdrop-filter:blur(16px);border:1px solid var(--bd);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.r{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+input,select,textarea{padding:9px 12px;border-radius:12px;border:1px solid var(--bd);background:rgba(0,0,0,.3);color:#fff;font:inherit}
+input:focus,select:focus,textarea:focus{outline:0;box-shadow:0 0 0 2px var(--pc)}
+.grow{flex:1;min-width:160px}
+.b{border:0;border-radius:12px;padding:9px 16px;color:#fff;font:inherit;cursor:pointer;background:linear-gradient(135deg,#ec4899,#8b5cf6,#3b82f6)}
+.b:disabled{opacity:.4;cursor:not-allowed}
+.b.s{background:rgba(255,255,255,.12);border:1px solid var(--bd)}
+.b.x{background:#be123c}
+.fr{display:grid;grid-template-columns:200px 1fr 36px;gap:8px;align-items:start;margin-bottom:8px}
+.fr .k{padding-top:9px;font-size:14px;word-break:break-all}
+.fr textarea{width:100%;resize:vertical;min-height:40px}
+.tag{font-size:11px;padding:2px 7px;border-radius:9px;background:rgba(52,211,153,.3)}
+.tag.w{background:rgba(251,191,36,.35)}
+small{opacity:.75}
+#ov{position:fixed;inset:0;background:rgba(5,3,20,.7);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:9}
+.sp{width:48px;height:48px;border-radius:50%;border:5px solid rgba(255,255,255,.2);border-top-color:#ec4899;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+#tt{position:fixed;right:14px;top:14px;z-index:10;display:flex;flex-direction:column;gap:8px}
+.t{padding:11px 16px;border-radius:12px;background:rgba(16,185,129,.92)}
+.t.e{background:rgba(244,63,94,.94)}
+@media(max-width:640px){.fr{grid-template-columns:1fr 36px}.fr .k{grid-column:1/-1;padding-top:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📄 ระบบสร้างเอกสารอัตโนมัติ</h1>
+
+  <section class="g">
+    <h3>1. เลือกเทมเพลต</h3>
+    <div class="r"><select id="tsel" class="grow"></select><button class="b x" id="tdel">ลบเทมเพลต</button></div>
+    <div class="r"><label class="b s">⬆ อัปโหลด .docx<input type="file" id="tfile" accept=".docx,.doc" hidden></label>
+      <input id="tlink" class="grow" placeholder="หรือวางลิงก์ Google Docs"><button class="b s" id="tadd">เพิ่ม</button></div>
+    <div class="r"><small>สัญลักษณ์ในเทมเพลต:</small>
+      <select id="dsel"><option value="{{|}}">{{ชื่อ}}</option><option value="[[|]]">[[ชื่อ]]</option><option value="{|}">{ชื่อ}</option><option value="[|]">[ชื่อ]</option></select></div>
+  </section>
+
+  <section class="g">
+    <h3>2. กรอกข้อมูล <small id="cnt"></small></h3>
+    <div id="flds"><small>เลือกเทมเพลตเพื่อตรวจจับช่องกรอกอัตโนมัติ</small></div>
+    <div class="r" style="margin-top:10px"><button class="b s" id="add">+ เพิ่มช่อง</button><button class="b s" id="add10">+ เพิ่ม 10 ช่อง</button></div>
+  </section>
+
+  <section class="g">
+    <h3>3. สร้างเอกสาร</h3>
+    <div class="r"><input id="oname" class="grow" placeholder="ชื่อไฟล์ (เว้นว่างได้)"><label><input type="checkbox" id="keep" checked> เก็บสำเนาไว้ใน Drive</label></div>
+    <button class="b" id="gen">✨ สร้างเอกสาร</button>
+    <div id="res" style="margin-top:12px"></div>
+  </section>
+</div>
+<div id="ov"><div class="sp"></div><div id="om"></div></div>
+<div id="tt"></div>
+
+<script>
+var S = { tpls: [], tid: '', fields: [], det: [], open: '{{', close: '}}', max: 100, today: '', res: null };
+var $ = function (s) { return document.querySelector(s); };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function busy(m) { $('#ov').style.display = m ? 'flex' : 'none'; $('#om').textContent = m || ''; }
+function toast(m, err) { var d = document.createElement('div'); d.className = 't' + (err ? ' e' : ''); d.textContent = m; $('#tt').appendChild(d); setTimeout(function () { d.remove(); }, 4000); }
+function call(fn, args, label, ok) {
+  busy(label);
+  var r = google.script.run
+    .withSuccessHandler(function (x) { busy(); try { if (ok) ok(x); } catch (e) { toast(e.message, 1); } })
+    .withFailureHandler(function (e) { busy(); toast((e && e.message ? e.message : String(e)).replace(/^Error:\s*/, ''), 1); });
+  r[fn].apply(r, args || []);
+}
+
+// ---------- เทมเพลต ----------
+function drawTpl() {
+  $('#tsel').innerHTML = '<option value="">-- เลือกเทมเพลต --</option>' + S.tpls.map(function (t) {
+    return '<option value="' + esc(t.id) + '"' + (t.id === S.tid ? ' selected' : '') + '>' + esc(t.name) + '</option>';
+  }).join('');
+}
+function reload(selectId) {
+  call('listTemplates', [], 'กำลังโหลดเทมเพลต...', function (l) { S.tpls = l; S.tid = selectId || S.tid; drawTpl(); detect(); });
+}
+$('#tsel').addEventListener('change', function () {
+  S.tid = this.value; S.fields = S.fields.filter(function (f) { return !f.auto; }); S.det = []; detect();
+});
+$('#dsel').addEventListener('change', function () {
+  var p = this.value.split('|'); S.open = p[0]; S.close = p[1]; S.fields = S.fields.filter(function (f) { return !f.auto; }); detect();
+});
+$('#tdel').addEventListener('click', function () {
+  if (!S.tid) { toast('กรุณาเลือกเทมเพลต', 1); return; }
+  if (!confirm('ลบเทมเพลตนี้ใช่หรือไม่? (ย้ายไปถังขยะใน Drive)')) return;
+  call('deleteTemplate', [S.tid], 'กำลังลบ...', function () { S.tid = ''; S.fields = []; S.det = []; toast('ลบแล้ว'); reload(''); });
+});
+$('#tadd').addEventListener('click', function () {
+  var u = $('#tlink').value.trim(); if (!u) { toast('กรุณาวางลิงก์', 1); return; }
+  call('addTemplateFromLink', [u], 'กำลังเพิ่มเทมเพลต...', function (r) { $('#tlink').value = ''; toast('เพิ่มเทมเพลตแล้ว'); reload(r.id); });
+});
+$('#tfile').addEventListener('change', function () {
+  var f = this.files[0], inp = this; if (!f) return;
+  if (f.size > 20 * 1024 * 1024) { toast('ไฟล์ใหญ่เกิน 20 MB', 1); inp.value = ''; return; }
+  var fr = new FileReader();
+  fr.onload = function () {
+    call('uploadTemplate', [{ name: f.name, data: String(fr.result).split(',')[1] }], 'กำลังอัปโหลดและแปลงเทมเพลต...', function (r) { inp.value = ''; toast('เพิ่มเทมเพลตแล้ว'); reload(r.id); });
+  };
+  fr.onerror = function () { toast('อ่านไฟล์ไม่สำเร็จ', 1); };
+  fr.readAsDataURL(f);
+});
+
+// ---------- ตรวจจับสัญลักษณ์ ----------
+function detect() {
+  if (!S.tid) { drawFields(); return; }
+  call('detectFields', [S.tid, S.open, S.close], 'กำลังตรวจจับสัญลักษณ์...', function (r) {
+    var old = {}; S.fields.forEach(function (f) { old[f.key] = f.value; });
+    var manual = S.fields.filter(function (f) { return !f.auto && r.fields.indexOf(f.key) < 0; });
+    S.det = r.fields;
+    S.fields = r.fields.map(function (k) { return { key: k, value: old[k] !== undefined ? old[k] : (k === 'วันที่' ? S.today : ''), auto: true }; }).concat(manual);
+    if (r.total > S.max) toast('พบสัญลักษณ์ ' + r.total + ' ช่อง แสดงสูงสุด ' + S.max + ' ช่อง', 1);
+    else if (!r.fields.length) toast('ไม่พบสัญลักษณ์ในเทมเพลต ตรวจสอบรูปแบบสัญลักษณ์ที่เลือก', 1);
+    drawFields();
+  });
+}
+
+// ---------- ช่องกรอก ----------
+function drawFields() {
+  $('#cnt').textContent = '(' + S.fields.length + ' / ' + S.max + ' ช่อง)';
+  $('#add').disabled = S.fields.length >= S.max;
+  $('#add10').disabled = S.fields.length >= S.max;
+  if (!S.fields.length) { $('#flds').innerHTML = '<small>' + (S.tid ? 'ยังไม่มีช่องกรอก กด "+ เพิ่มช่อง"' : 'เลือกเทมเพลตเพื่อตรวจจับช่องกรอกอัตโนมัติ') + '</small>'; return; }
+  var o = S.open, c = S.close;
+  $('#flds').innerHTML = S.fields.map(function (f, i) {
+    var found = S.det.indexOf(f.key.trim()) > -1;
+    var k = f.auto ? '<b>' + esc(o + f.key + c) + '</b> <span class="tag">พบในเอกสาร</span>'
+      : '<input class="fk" data-i="' + i + '" value="' + esc(f.key) + '" placeholder="ชื่อสัญลักษณ์" style="width:100%"> ' + (f.key.trim() ? (found ? '<span class="tag">พบในเอกสาร</span>' : '<span class="tag w">ไม่พบในเอกสาร</span>') : '');
+    return '<div class="fr"><div class="k">' + k + '</div><textarea class="fv" data-i="' + i + '" rows="1">' + esc(f.value) + '</textarea>' +
+      (f.auto ? '<span></span>' : '<button class="b x" style="padding:6px" data-del="' + i + '">✕</button>') + '</div>';
+  }).join('');
+}
+$('#flds').addEventListener('input', function (e) {
+  var i = e.target.getAttribute('data-i'); if (i === null) return;
+  if (e.target.classList.contains('fv')) S.fields[i].value = e.target.value;
+  if (e.target.classList.contains('fk')) S.fields[i].key = e.target.value;
+});
+$('#flds').addEventListener('change', function (e) { if (e.target.classList.contains('fk')) drawFields(); });
+$('#flds').addEventListener('click', function (e) {
+  var d = e.target.getAttribute('data-del'); if (d === null) return;
+  S.fields.splice(Number(d), 1); drawFields();
+});
+function addFields(n) {
+  for (var i = 0; i < n && S.fields.length < S.max; i++) S.fields.push({ key: '', value: '', auto: false });
+  drawFields();
+}
+$('#add').addEventListener('click', function () { addFields(1); });
+$('#add10').addEventListener('click', function () { addFields(10); });
+
+// ---------- สร้างเอกสาร ----------
+$('#gen').addEventListener('click', function () {
+  if (!S.tid) { toast('กรุณาเลือกเทมเพลต', 1); return; }
+  var vals = {}, seen = {};
+  for (var i = 0; i < S.fields.length; i++) {
+    var f = S.fields[i], k = f.key.trim();
+    if (!k) { if (f.value.trim()) { toast('ช่องที่ ' + (i + 1) + ' ยังไม่ได้ตั้งชื่อสัญลักษณ์', 1); return; } continue; }
+    if (seen[k]) { toast('ชื่อสัญลักษณ์ซ้ำ: ' + k, 1); return; }
+    seen[k] = 1; vals[k] = f.value;
+  }
+  call('generateDocument', [{ templateId: S.tid, open: S.open, close: S.close, name: $('#oname').value, keep: $('#keep').checked, values: vals }], 'กำลังสร้างเอกสาร...', function (r) {
+    S.res = r; toast('สร้างเอกสารสำเร็จ');
+    $('#res').innerHTML = '<div style="margin-bottom:8px"><b>' + esc(r.name) + '</b></div><div class="r"><button class="b" onclick="dl(S.res.pdf)">⬇ PDF</button><button class="b" onclick="dl(S.res.docx)">⬇ Word (.docx)</button>' +
+      (r.docUrl ? '<a class="b s" style="text-decoration:none" target="_blank" href="' + esc(r.docUrl) + '">เปิดใน Google Docs</a>' : '') + '</div>';
+  });
+});
+function dl(f) {
+  var b = atob(f.data), u = new Uint8Array(b.length);
+  for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([u], { type: f.mime })); a.download = f.name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ---------- เริ่มระบบ ----------
+call('getBootData', [], 'กำลังโหลด...', function (d) { S.tpls = d.templates; S.max = d.max; S.today = d.today; drawTpl(); drawFields(); });
+</script>
+</body>
+</html>
